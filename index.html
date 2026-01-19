@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ClipByNaim Pro Live Recorder</title>
+<script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
+<style>
+body {
+  margin:0;
+  background: linear-gradient(160deg,#0f2027,#203a43,#2c5364);
+  font-family:'Arial',sans-serif;
+  color:#fff;
+  text-align:center;
+  padding:15px;
+}
+h2 {
+  font-size:26px;
+  color:#00ffe7;
+  text-shadow:0 0 10px #00ffe7;
+}
+input {
+  width:95%;
+  padding:16px;
+  font-size:16px;
+  border-radius:12px;
+  border:none;
+  margin-bottom:12px;
+  background:#1a1a1a;
+  color:#fff;
+  box-shadow:0 0 12px #00ffe7;
+}
+button {
+  width:95%;
+  padding:20px;
+  font-size:20px;
+  border-radius:14px;
+  border:none;
+  margin:8px 0;
+  font-weight:bold;
+  cursor:pointer;
+  transition: all 0.2s;
+  box-shadow:0 5px rgba(0,0,0,0.3);
+}
+button:active { transform:translateY(2px); box-shadow:0 2px rgba(0,0,0,0.2); }
+#playBtn { background:linear-gradient(90deg,#ff4b1f,#1fddff); color:#fff; }
+#recBtn { background:linear-gradient(90deg,#ff1f4b,#ffdf1f); color:#fff; }
+#stopBtn { background:linear-gradient(90deg,#fff,#aaa); color:#000; }
+video {
+  width:100%;
+  border-radius:16px;
+  margin:15px 0;
+  background:#000;
+  box-shadow:0 0 25px rgba(0,255,255,0.5);
+}
+#msg { color:#00ffe7; font-size:15px; margin-top:5px; text-shadow:0 0 5px #00ffe7; }
+</style>
+</head>
+<body>
+
+<h2>ClipByNaim – Pro Live Recorder</h2>
+
+<input id="link" placeholder="Paste LIVE .m3u8 link here">
+<button id="playBtn">▶ PLAY LIVE</button>
+<button id="recBtn">● REC</button>
+<button id="stopBtn">■ STOP & SAVE</button>
+
+<video id="v" controls playsinline preload="auto" autoplay muted></video>
+<p id="msg"></p>
+
+<script>
+const v = document.getElementById("v");
+const linkInput = document.getElementById("link");
+const msg = document.getElementById("msg");
+const recBtn = document.getElementById("recBtn");
+
+let mediaRecorder;
+let chunks=[];
+
+// --- PLAY LIVE (Smooth + Low-latency like Cricfy) ---
+document.getElementById("playBtn").onclick = () => {
+  const url = linkInput.value.trim();
+  if(!url) return alert("Paste LIVE .m3u8 link!");
+
+  if(Hls.isSupported()){
+    const hls = new Hls({
+      liveSyncDurationCount:5,
+      maxBufferLength:30,
+      maxLiveSyncLatency:10, // low-latency
+      enableWorker:true,
+      lowLatencyMode:true
+    });
+    hls.loadSource(url);
+    hls.attachMedia(v);
+    hls.on(Hls.Events.MANIFEST_PARSED,()=>v.play());
+  } else {
+    v.src = url;
+    v.play();
+  }
+  v.autoplay = true;
+  v.muted = false;
+  msg.innerText = "LIVE playing smoothly...";
+}
+
+// --- START HIGH-QUALITY RECORD ---
+document.getElementById("recBtn").onclick = () => {
+  if(!v.captureStream){ alert("Mobile browser cannot record."); return; }
+  recBtn.disabled = true;
+  chunks=[];
+  // captureStream with 30fps
+  let stream = v.captureStream(30);
+  mediaRecorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9', videoBitsPerSecond: 3000000 });
+  mediaRecorder.ondataavailable = e => chunks.push(e.data);
+  mediaRecorder.onstop = () => {
+    const blob = new Blob(chunks,{type:"video/webm"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+
+    // Auto filename
+    const dt = new Date();
+    const filename = `ClipByNaim_${dt.getFullYear()}${(dt.getMonth()+1).toString().padStart(2,'0')}${dt.getDate().toString().padStart(2,'0')}_${dt.getHours().toString().padStart(2,'0')}${dt.getMinutes().toString().padStart(2,'0')}${dt.getSeconds().toString().padStart(2,'0')}.webm`;
+    a.download = filename;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    msg.innerText = "⬇ High-quality video ready!";
+    recBtn.disabled = false;
+  }
+  mediaRecorder.start();
+  msg.innerText = "🔴 Recording LIVE (High-quality)...";
+}
+
+// --- STOP RECORD ---
+document.getElementById("stopBtn").onclick = () => {
+  if(mediaRecorder) mediaRecorder.stop();
+}
+</script>
+
+</body>
+</html>
